@@ -2,34 +2,34 @@
 import sys
 import os
 import re
-import thread
+import thread, threading
 import xbmc, xbmcgui, xbmcvfs
 from threading import Timer
 from utilities import *
 from embedlrc import *
 
+__cwd__       = sys.modules[ "__main__" ].__cwd__
 __addon__     = sys.modules[ "__main__" ].__addon__
+__addonname__ = sys.modules[ "__main__" ].__addonname__
 __profile__   = sys.modules[ "__main__" ].__profile__
 __language__  = sys.modules[ "__main__" ].__language__
 
-class GUI( xbmcgui.WindowXMLDialog ):
+class MAIN():
     def __init__( self, *args, **kwargs ):
-        xbmcgui.WindowXMLDialog.__init__( self )
-
-    def onInit( self ):
-        self.setup_all()
-
-    def setup_all( self ):
-        try:
-            self.getControl( 299 ).setVisible(False)
-        except:
-            pass
-        self.setup_variables()
-        self.win.setProperty('culrc.running', 'true')
+        self.mode = kwargs['mode']
+        self.setup_main()
+        WIN.setProperty('culrc.running', 'true')
         self.get_scraper_list()
-        self.getMyPlayer()
         if ( __addon__.getSetting( "save_lyrics_path" ) == "" ):
             __addon__.setSetting(id="save_lyrics_path", value=os.path.join( __profile__.encode("utf-8"), "lyrics" ))
+        self.main_loop()
+
+    def setup_main( self ):
+        self.scrapers = []
+        self.fetchedLyrics = []
+        self.current_lyrics = Lyrics()
+        self.MyPlayer = MyPlayer( xbmc.PLAYER_CORE_PAPLAYER, function=self.myPlayerChanged )
+        self.Monitor = MyMonitor(function = self.get_settings)
 
     def get_scraper_list( self ):
         for scraper in os.listdir(LYRIC_SCRAPER_DIR):
@@ -38,7 +38,264 @@ class GUI( xbmcgui.WindowXMLDialog ):
                 exec ( "self.scrapers.append([lyricsScraper_%s.__priority__,lyricsScraper_%s.LyricsFetcher(),lyricsScraper_%s.__title__,lyricsScraper_%s.__lrc__])" % (scraper, scraper, scraper, scraper))
                 self.scrapers.sort()
 
-    def setup_variables( self ):
+    def main_loop( self ):
+        self.triggered = False
+        # main loop
+        while (not xbmc.abortRequested) and (WIN.getProperty('culrc.quit') == ''):
+            # check if we are on the music visualization screen
+            if xbmc.getCondVisibility("Window.IsVisible(12006)"):
+                if not self.triggered:
+                    self.triggered = True
+                    # notify user the script is running
+                    xbmc.executebuiltin((u'Notification(%s,%s,%i)' % (__addonname__ , __language__(30004), 2000)).encode('utf-8', 'ignore'))
+                    # start fetching lyrics
+                    self.myPlayerChanged()
+            else:
+                # we may have exited the music visualization screen
+                self.triggered = False
+                # reset current lyrics so we show them again when re-entering the visualization screen
+                self.current_lyrics = Lyrics()
+            xbmc.sleep(1000)
+        WIN.clearProperty('culrc.quit')
+        WIN.clearProperty('culrc.running')
+
+    def get_lyrics(self, song):
+        #xbmc.sleep( 60 )
+        lyrics = self.get_lyrics_from_memory( song )
+        if lyrics:
+            return lyrics
+        if song.title:
+            lyrics = self.find_lyrics( song )
+        else:
+            lyrics = Lyrics()
+            lyrics.song = song
+            lyrics.source = ''
+            lyrics.lyrics = ''
+        self.save_lyrics_to_memory(lyrics)
+        return lyrics
+
+    def find_lyrics(self, song):
+        # search embedded lrc lyrics
+        if ( __addon__.getSetting( "search_embedded" ) == "true" ):
+            lyrics = getEmbedLyrics(song, True)
+            if ( lyrics ):
+                log('found embedded lrc lyrics')
+                return lyrics
+        # search lrc lyrics in file
+        if ( __addon__.getSetting( "search_file" ) == "true" ):
+            lyrics = self.get_lyrics_from_file(song, True)
+            if ( lyrics ):
+                log('found lrc lyrics from file')
+                return lyrics
+        # search lrc lyrics by scrapers
+        for scraper in self.scrapers:
+            if scraper[3]:
+                lyrics = scraper[1].get_lyrics( song )
+                if ( lyrics ):
+                    log('found lrc lyrics online')
+                    self.save_lyrics_to_file( lyrics )
+                    return lyrics
+        # search embedded txt lyrics
+        if ( __addon__.getSetting( "search_embedded" ) == "true" ):
+            lyrics = getEmbedLyrics(song, False)
+            if lyrics:
+                log('found embedded txt lyrics')
+                return lyrics
+        # search txt lyrics in file
+        if ( __addon__.getSetting( "search_file" ) == "true" ):
+            lyrics = self.get_lyrics_from_file(song, False)
+            if ( lyrics ):
+                log('found txt lyrics from file')
+                return lyrics
+        # search txt lyrics by scrapers
+        for scraper in self.scrapers:
+            if not scraper[3]:
+                lyrics = scraper[1].get_lyrics( song )
+                if ( lyrics ):
+                    log('found txt lyrics online')
+                    self.save_lyrics_to_file( lyrics )
+                    return lyrics
+        log('no lyrics found')
+        lyrics = Lyrics()
+        lyrics.song = song
+        lyrics.source = ''
+        lyrics.lyrics = ''
+        return lyrics
+
+    def get_lyrics_from_list( self, item ):
+        lyric = eval(item.getProperty('lyric'))
+        for item in self.scrapers:
+            if item[2] == self.current_lyrics.source:
+                scraper = item[1]
+                break
+        self.current_lyrics.lyrics = scraper.get_lyrics_from_list( lyric )
+
+    def get_lyrics_from_memory (self, song):
+        for l in self.fetchedLyrics:
+            if ( l.song == song ):
+                log('found lyrics in memory')
+                return l
+        return None
+
+    def get_lyrics_from_file( self, song, getlrc ):
+        lyrics = Lyrics()
+        lyrics.song = song
+        lyrics.source = __language__( 30000 )
+        lyrics.lrc = getlrc
+        # Search save path by Cu LRC Lyrics
+        song_path = song.path1(getlrc)
+        if xbmcvfs.exists(song_path):
+            lyr = get_textfile( song_path )
+            if lyr:
+                lyrics.lyrics = lyr
+                return lyrics
+        # Search same path with song file
+        song_path = song.path2(getlrc)
+        if xbmcvfs.exists(song_path):
+            lyr = get_textfile( song_path )
+            if lyr:
+                lyrics.lyrics = lyr
+                return lyrics
+        return None
+
+    def save_lyrics_to_memory (self, lyrics):
+        savedLyrics = self.get_lyrics_from_memory(lyrics.song)
+        if ( savedLyrics is None ):
+            self.fetchedLyrics.append(lyrics)
+            self.fetchedLyrics = self.fetchedLyrics[:10]
+
+    def save_lyrics_to_file( self, lyrics ):
+        if isinstance (lyrics.lyrics, str):
+            lyr = lyrics.lyrics
+        else:
+            lyr = lyrics.lyrics.encode('utf-8')
+        if ( __addon__.getSetting( "save_lyrics1" ) == "true" ):
+            file_path = lyrics.song.path1(lyrics.lrc)
+            success = self.write_lyrics_file( file_path, lyr)
+        if ( __addon__.getSetting( "save_lyrics2" ) == "true" ):
+            file_path = lyrics.song.path2(lyrics.lrc)
+            success = self.write_lyrics_file( file_path, lyr)
+
+    def write_lyrics_file( self, file, data):
+        try:
+            if ( not xbmcvfs.exists( os.path.dirname( file ) ) ):
+                xbmcvfs.mkdirs( os.path.dirname( file ) )
+            lyrics_file = xbmcvfs.File( file, "w" )
+            lyrics_file.write( data )
+            lyrics_file.close()
+            return True
+        except:
+            log( "failed to save lyrics" )
+            return False
+
+    def myPlayerChanged( self ):
+        global lyrics
+        for cnt in range( 5 ):
+            song = Song.current()
+            if ( song and ( self.current_lyrics.song != song ) ):
+                lyrics = self.get_lyrics( song )
+                self.current_lyrics = lyrics
+                if lyrics.lyrics:
+                    # signal the gui thread to display the next lyrics
+                    WIN.setProperty('culrc.newlyrics', 'TRUE')
+                    # check if gui is already running
+                    if not WIN.getProperty('culrc.guirunning') == 'TRUE':
+                        WIN.setProperty('culrc.guirunning', 'TRUE')
+                        gui = guiThread(mode=self.mode)
+                        gui.start()
+                else:
+                    # signal gui thread to exit
+                    WIN.setProperty('culrc.nolyrics', 'TRUE')
+                    # notify user no lyrics were found
+                    xbmc.executebuiltin((u'Notification(%s,%s,%i)' % (__addonname__ + ": " + __language__(30001), song.artist + " - " + song.title, 2000)).encode('utf-8', 'ignore'))
+                break
+            xbmc.sleep( 50 )
+        if xbmc.getCondVisibility('MusicPlayer.HasNext'):
+            next_song = Song.next()
+            if next_song:
+                self.get_lyrics( next_song )
+            else:
+                log( "Missing Artist or Song name in ID3 tag for next track" )
+
+    def get_settings( self ):
+        service = __addon__.getSetting('service')
+        if service == "true":
+            self.mode = 'service'
+        else:
+            self.mode = 'manual'
+            # quit the script is mode was changed from service to manual
+            WIN.setProperty('culrc.quit', 'TRUE')
+
+class guiThread(threading.Thread):
+    def __init__( self, *args, **kwargs ):
+        threading.Thread.__init__( self )
+        self.mode = kwargs[ "mode" ]
+
+    def run(self):
+        ui = GUI( "script-XBMC_Lyrics-main.xml" , __cwd__, "Default", mode=self.mode )
+        ui.doModal()
+        del ui
+        WIN.clearProperty('culrc.guirunning')
+
+class GUI( xbmcgui.WindowXMLDialog ):
+    def __init__( self, *args, **kwargs ):
+        xbmcgui.WindowXMLDialog.__init__( self )
+        self.mode = kwargs[ "mode" ]
+       
+    def onInit( self ):
+        self.setup_gui()
+        self.process_lyrics()
+        self.gui_loop()
+
+    def process_lyrics( self ):
+        global lyrics
+        self.lyrics = lyrics
+        self.stop_refresh()
+        self.reset_controls()
+        if self.lyrics.lyrics:
+            self.show_lyrics(self.lyrics)
+        else:
+            self.show_error()
+        self.getControl( 120 ).reset()
+        if self.lyrics.list:
+            try:
+                self.getControl( 299 ).setVisible(True)
+            except:
+                pass
+            self.prepare_list(self.lyrics.list)
+        else:
+            try:
+                self.getControl( 299 ).setVisible(False)
+            except:
+                pass
+
+    def gui_loop( self ):
+        # gui loop
+        while self.showgui and (not xbmc.abortRequested) and xbmc.getCondVisibility('Player.HasAudio'):
+            # check if we have new lyrics
+            if WIN.getProperty("culrc.newlyrics") == "TRUE":
+                WIN.clearProperty('culrc.newlyrics')
+                # show new lyrics
+                self.process_lyrics()
+            # check if we have no lyrics
+            elif WIN.getProperty("culrc.nolyrics") == "TRUE":
+                # no lyrics, close the gui
+                self.exit_gui('close')
+            xbmc.sleep(500)
+        # music ended, close the gui
+        if (not xbmc.getCondVisibility('Player.HasAudio')):
+            self.exit_gui('quit')
+        # xbmc quits, close the gui 
+        elif xbmc.abortRequested:
+            self.exit_gui('quit')
+
+    def setup_gui( self ):
+        WIN.clearProperty('culrc.newlyrics')
+        WIN.clearProperty('culrc.nolyrics')
+        try:
+            self.getControl( 299 ).setVisible(False)
+        except:
+            pass
         self.lock = thread.allocate_lock()
         self.timer = None
         self.allowtimer = True
@@ -46,11 +303,8 @@ class GUI( xbmcgui.WindowXMLDialog ):
         self.selected = False
         self.controlId = -1
         self.pOverlay = []
-        self.scrapers = []
-        self.fetchedLyrics = []
-        self.current_lyrics = Lyrics()
         self.scroll_line = int(self.get_page_lines() / 2)
-        self.win = xbmcgui.Window( 10000 )
+        self.showgui = True
 
     def get_page_lines( self ):
         self.getControl( 110 ).setVisible( False )
@@ -119,145 +373,14 @@ class GUI( xbmcgui.WindowXMLDialog ):
             except:
                 self.setFocus( self.getControl( controlId + 1 ) )
 
-    def get_lyrics(self, song):
-        #xbmc.sleep( 60 )
-        lyrics = self.get_lyrics_from_memory( song )
-        if lyrics:
-            return lyrics
-
-        if song.title:
-            lyrics = self.find_lyrics( song )
-        else:
-            lyrics = Lyrics()
-            lyrics.song = song
-            lyrics.source = ''
-            lyrics.lyrics = ''
-        self.save_lyrics_to_memory(lyrics)
-        return lyrics
-
-    def find_lyrics(self, song):
-        # search embedded lrc lyrics
-        if ( __addon__.getSetting( "search_embedded" ) == "true" ):
-            lyrics = getEmbedLyrics(song, True)
-            if ( lyrics ):
-                log('found embedded lrc lyrics')
-                return lyrics
-        # search lrc lyrics in file
-        if ( __addon__.getSetting( "search_file" ) == "true" ):
-            lyrics = self.get_lyrics_from_file(song, True)
-            if ( lyrics ):
-                log('found lrc lyrics from file')
-                return lyrics
-        # search lrc lyrics by scrapers
-        for scraper in self.scrapers:
-            if scraper[3]:
-                lyrics = scraper[1].get_lyrics( song )
-                if ( lyrics ):
-                    log('found lrc lyrics online')
-                    self.save_lyrics_to_file( lyrics )
-                    return lyrics
-
-        # search embedded txt lyrics
-        if ( __addon__.getSetting( "search_embedded" ) == "true" ):
-            lyrics = getEmbedLyrics(song, False)
-            if lyrics:
-                log('found embedded txt lyrics')
-                return lyrics
-        # search txt lyrics in file
-        if ( __addon__.getSetting( "search_file" ) == "true" ):
-            lyrics = self.get_lyrics_from_file(song, False)
-            if ( lyrics ):
-                log('found txt lyrics from file')
-                return lyrics
-        # search txt lyrics by scrapers
-        for scraper in self.scrapers:
-            if not scraper[3]:
-                lyrics = scraper[1].get_lyrics( song )
-                if ( lyrics ):
-                    log('found txt lyrics online')
-                    self.save_lyrics_to_file( lyrics )
-                    return lyrics
-        log('no lyrics found')
-        lyrics = Lyrics()
-        lyrics.song = song
-        lyrics.source = ''
-        lyrics.lyrics = ''
-        return lyrics
-
-    def get_lyrics_from_list( self, item ):
-        lyric = eval(item.getProperty('lyric'))
-        for item in self.scrapers:
-            if item[2] == self.current_lyrics.source:
-                scraper = item[1]
-                break
-        self.current_lyrics.lyrics = scraper.get_lyrics_from_list( lyric )
-
-    def get_lyrics_from_memory (self, song):
-        for l in self.fetchedLyrics:
-            if ( l.song == song ):
-                return l
-        return None
-
-    def get_lyrics_from_file( self, song, getlrc ):
-        lyrics = Lyrics()
-        lyrics.song = song
-        lyrics.source = __language__( 30000 )
-        lyrics.lrc = getlrc
-
-        # Search save path by Cu LRC Lyrics
-        song_path = song.path1(getlrc)
-        if xbmcvfs.exists(song_path):
-            lyr = get_textfile( song_path )
-            if lyr:
-                lyrics.lyrics = lyr
-                return lyrics
-        # Search same path with song file
-        song_path = song.path2(getlrc)
-        if xbmcvfs.exists(song_path):
-            lyr = get_textfile( song_path )
-            if lyr:
-                lyrics.lyrics = lyr
-                return lyrics
-        return None
-
-    def save_lyrics_to_memory (self, lyrics):
-        savedLyrics = self.get_lyrics_from_memory(lyrics.song)
-        if ( savedLyrics is None ):
-            self.fetchedLyrics.append(lyrics)
-            self.fetchedLyrics =  self.fetchedLyrics[:10]
-
-    def save_lyrics_to_file( self, lyrics ):
-        if isinstance (lyrics.lyrics, str):
-            lyr = lyrics.lyrics
-        else:
-            lyr = lyrics.lyrics.encode('utf-8')
-        if ( __addon__.getSetting( "save_lyrics1" ) == "true" ):
-            file_path = lyrics.song.path1(lyrics.lrc)
-            success = self.write_lyrics_file( file_path, lyr)
-        if ( __addon__.getSetting( "save_lyrics2" ) == "true" ):
-            file_path = lyrics.song.path2(lyrics.lrc)
-            success = self.write_lyrics_file( file_path, lyr)
-
-    def write_lyrics_file( self, file, data):
-        try:
-            if ( not xbmcvfs.exists( os.path.dirname( file ) ) ):
-                xbmcvfs.mkdirs( os.path.dirname( file ) )
-            lyrics_file = xbmcvfs.File( file, "w" )
-            lyrics_file.write( data )
-            lyrics_file.close()
-            return True
-        except:
-            log( "failed to save lyrics" )
-            return False
-
     def show_error(self):
         self.getControl( 100 ).setText( __language__( 30001 ) )
-        self.win.setProperty('culrc.lyrics', __language__( 30001 ))
+        WIN.setProperty('culrc.lyrics', __language__( 30001 ))
         self.show_control( 100 )
 
     def show_lyrics( self, lyrics ):
-        self.win.setProperty('culrc.lyrics', lyrics.lyrics)
-        self.win.setProperty('culrc.source', lyrics.source)
+        WIN.setProperty('culrc.lyrics', lyrics.lyrics)
+        WIN.setProperty('culrc.source', lyrics.source)
         if lyrics.list:
             source = '%s (%d)' % (lyrics.source, len(lyrics.list))
         else:
@@ -319,15 +442,17 @@ class GUI( xbmcgui.WindowXMLDialog ):
         self.getControl( 100 ).setText(xbmc.getLocalizedString(194))
         self.getControl( 110 ).reset()
         self.getControl( 200 ).setLabel('')
-        self.win.clearProperty('culrc.lyrics')
-        self.win.clearProperty('culrc.source')
+        WIN.clearProperty('culrc.lyrics')
+        WIN.clearProperty('culrc.source')
 
-    def exit_script( self ):
-        self.win.clearProperty('culrc.lyrics')
-        self.win.clearProperty('culrc.source')
-        self.win.clearProperty('culrc.running')
+    def exit_gui( self, action ):
+        # in manual mode, we also need to quit the script when the user cancels the gui or music has ended
+        if (self.mode == 'manual') and (action == 'quit'):
+            # signal the main loop to quit
+            WIN.setProperty('culrc.quit', 'TRUE')
         self.allowtimer = False
         self.stop_refresh()
+        self.showgui = False
         self.close()
 
     def onClick( self, controlId ):
@@ -341,67 +466,26 @@ class GUI( xbmcgui.WindowXMLDialog ):
     def onAction( self, action ):
         actionId = action.getId()
         if ( actionId in CANCEL_DIALOG ):
-            self.exit_script()
+            # dialog cancelled, close the gui
+            self.exit_gui('quit')
         elif ( actionId == 101 ) or ( actionId == 117 ): # ACTION_MOUSE_RIGHT_CLICK / ACTION_CONTEXT_MENU
             self.reshow_choices()
 
-    def getMyPlayer( self ):
-        self.MyPlayer = MyPlayer( xbmc.PLAYER_CORE_PAPLAYER, function=self.myPlayerChanged )
-        self.myPlayerChanged( 2 )
-
-    def myPlayerChanged( self, event ):
-        log( "myPlayer event: %s" % ([ "stopped","ended","started" ][ event ]) )
-        if ( event < 2 ):
-            self.exit_script()
-        else:
-            for cnt in range( 5 ):
-                song = Song.current()
-                if ( song and ( self.current_lyrics.song != song ) ):
-                    self.stop_refresh()
-                    self.reset_controls()
-                    lyrics = self.get_lyrics( song )
-                    self.current_lyrics = lyrics
-                    if lyrics.lyrics:
-                        self.show_lyrics(lyrics)
-                    else:
-                        self.show_error()
-                    self.getControl( 120 ).reset()
-                    if lyrics.list:
-                        try:
-                            self.getControl( 299 ).setVisible(True)
-                        except:
-                            pass
-                        self.prepare_list(lyrics.list)
-                    else:
-                        try:
-                            self.getControl( 299 ).setVisible(False)
-                        except:
-                            pass
-                    break
-                xbmc.sleep( 50 )
-
-            if xbmc.getCondVisibility('MusicPlayer.HasNext'):
-                next_song = Song.next()
-                if next_song:
-                    self.get_lyrics( next_song )
-                else:
-                    log( "Missing Artist or Song name in ID3 tag for next track" )
-
-            if (self.allowtimer and (not self.refreshing) and self.getControl( 110 ).size() > 1):
-                if self.current_lyrics.lrc:
-                    self.refresh()
-
 class MyPlayer( xbmc.Player ):
-    """ Player Class: calls function when song changes or playback ends """
     def __init__( self, *args, **kwargs ):
         xbmc.Player.__init__( self )
         self.function = kwargs[ "function" ]
 
-    def onPlayBackStopped( self ):
-        self.function( 0 )
-
-    def onPlayBackEnded( self ):
-        self.function( 1 )
-
     def onPlayBackStarted( self ):
-        self.function( 2 )
+        if xbmc.getCondVisibility("Window.IsVisible(12006)"):
+            self.function()
+
+class MyMonitor(xbmc.Monitor):
+    def __init__( self, *args, **kwargs ):
+        xbmc.Monitor.__init__( self )
+        self.function = kwargs[ "function" ]
+
+    def onSettingsChanged( self ):
+        # sleep before retrieving the new settings
+        xbmc.sleep(500)
+        self.function()

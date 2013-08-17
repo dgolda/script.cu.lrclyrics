@@ -2,7 +2,7 @@ import sys
 import os
 import chardet
 import unicodedata
-import xbmc, xbmcvfs
+import xbmc, xbmcvfs, xbmcgui
 if sys.version_info < (2, 7):
     import simplejson
 else:
@@ -15,6 +15,7 @@ __cwd__       = sys.modules[ "__main__" ].__cwd__
 
 CANCEL_DIALOG = ( 9, 10, 92, 216, 247, 257, 275, 61467, 61448, )
 LYRIC_SCRAPER_DIR = os.path.join(__cwd__, "resources", "lib", "culrcscrapers")
+WIN = xbmcgui.Window( 10000 )
 
 def log(txt):
     if isinstance (txt,str):
