@@ -203,6 +203,7 @@ class MAIN():
         for cnt in range( 5 ):
             song = Song.current()
             if ( song and ( self.current_lyrics.song != song ) ):
+                log("Current Song: %s - %s" % (song.artist, song.title))
                 lyrics = self.get_lyrics( song )
                 self.current_lyrics = lyrics
                 if lyrics.lyrics:
@@ -223,6 +224,7 @@ class MAIN():
         if xbmc.getCondVisibility('MusicPlayer.HasNext'):
             next_song = Song.next()
             if next_song:
+                log("Next Song: %s - %s" % (song.artist, song.title))
                 self.get_lyrics( next_song )
             else:
                 log( "Missing Artist or Song name in ID3 tag for next track" )

@@ -132,14 +132,11 @@ class Song:
                 #  Radio version, short version, year of the song...
                 # It often disturbs the lyrics search so we remove it
                 song.title = re.sub(r'\([^\)]*\)$', '', song.title)
-
-        log("Current Song: %s - %s" % (song.artist, song.title))
         return song
 
     @staticmethod
     def next():
         song = Song.by_offset(1)
-        log("Next Song: %s - %s" % (song.artist, song.title))
         if song.artist != '' and song.title != '':
             return song
 
