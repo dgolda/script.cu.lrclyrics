@@ -43,7 +43,7 @@ def get_textfile(filepath):
     except IOError:
         return None
 
-def get_artist_from_filename( filename ):
+def get_artist_from_filename(filename):
     try:
         artist = ''
         title = ''
@@ -67,7 +67,7 @@ def get_artist_from_filename( filename ):
     return artist, title
 
 class Lyrics:
-    def __init__( self ):
+    def __init__(self):
         self.song = Song()
         self.lyrics = ""
         self.source = ""
@@ -75,7 +75,7 @@ class Lyrics:
         self.lrc = False
 
 class Song:
-    def __init__( self ):
+    def __init__(self):
         self.artist = ""
         self.title = ""
         self.filepath = ""
@@ -120,7 +120,7 @@ class Song:
     def current():
         song = Song.by_offset(0)
 
-        if not song.artist and not xbmc.getInfoLabel( "MusicPlayer.TimeRemaining"):
+        if not song.artist and not xbmc.getInfoLabel("MusicPlayer.TimeRemaining"):
             # no artist and infinite playing time ? We probably listen to a radio
             # which usually set the song title as "Artist - Title" (via ICY StreamTitle)
             sep = song.title.find("-")
@@ -133,13 +133,13 @@ class Song:
                 # It often disturbs the lyrics search so we remove it
                 song.title = re.sub(r'\([^\)]*\)$', '', song.title)
 
-        log( "Current Song: %s:%s" % (song.artist, song.title))
+        log("Current Song: %s - %s" % (song.artist, song.title))
         return song
 
     @staticmethod
     def next():
         song = Song.by_offset(1)
-        log( "Next Song: %s:%s" % (song.artist, song.title))
+        log("Next Song: %s - %s" % (song.artist, song.title))
         if song.artist != '' and song.title != '':
             return song
 
