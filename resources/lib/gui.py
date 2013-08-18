@@ -61,8 +61,10 @@ class MAIN():
 
     def get_lyrics(self, song):
         #xbmc.sleep( 60 )
+        log('searching memory for lyrics')
         lyrics = self.get_lyrics_from_memory( song )
         if lyrics:
+            log('found lyrics in memory')
             return lyrics
         if song.title:
             lyrics = self.find_lyrics( song )
@@ -139,10 +141,8 @@ class MAIN():
         self.current_lyrics.lyrics = scraper.get_lyrics_from_list( lyric )
 
     def get_lyrics_from_memory(self, song):
-        log('searching memory for lyrics')
         for l in self.fetchedLyrics:
             if ( l.song == song ):
-                log('found lyrics in memory')
                 return l
         return None
 

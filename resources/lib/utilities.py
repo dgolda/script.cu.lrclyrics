@@ -40,7 +40,7 @@ def get_textfile(filepath):
             return unicode( data, enc['encoding'] ).encode( "utf-8")
     except UnicodeDecodeError:
         return data
-    except IOError:
+    except:
         return None
 
 def get_artist_from_filename(filename):
