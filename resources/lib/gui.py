@@ -25,13 +25,13 @@ class MAIN():
         self.main_loop()
 
     def setup_main(self):
-        self.scrapers = []
         self.fetchedLyrics = []
         self.current_lyrics = Lyrics()
         self.MyPlayer = MyPlayer( xbmc.PLAYER_CORE_PAPLAYER, function=self.myPlayerChanged )
-        self.Monitor = MyMonitor(function = self.get_settings)
+        self.Monitor = MyMonitor(function = self.update_settings)
 
     def get_scraper_list(self):
+        self.scrapers = []
         for scraper in os.listdir(LYRIC_SCRAPER_DIR):
             if os.path.isdir(os.path.join(LYRIC_SCRAPER_DIR, scraper)) and __addon__.getSetting( scraper ) == "true":
                 exec ( "from culrcscrapers.%s import lyricsScraper as lyricsScraper_%s" % (scraper, scraper))
@@ -227,7 +227,8 @@ class MAIN():
             else:
                 log( "Missing Artist or Song name in ID3 tag for next track" )
 
-    def get_settings(self):
+    def update_settings(self):
+        self.get_scraper_list()
         service = __addon__.getSetting('service')
         if service == "true":
             self.mode = 'service'

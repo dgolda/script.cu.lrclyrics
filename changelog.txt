@@ -1,5 +1,6 @@
 v2.0.2
 - fix crash when failing to read lyrics file
+- fixed update scraper list when settings change
 
 v2.0.1
 - fixed don't crash when trying to get embedded lyrics from online streams
