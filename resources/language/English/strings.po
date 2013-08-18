@@ -126,3 +126,7 @@ msgstr ""
 msgctxt "#30156"
 msgid "Run as a service"
 msgstr ""
+
+msgctxt "#30157"
+msgid "Clean song title (remove part in brackets)"
+msgstr ""

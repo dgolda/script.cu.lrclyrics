@@ -1,5 +1,6 @@
 v2.0.1
 - fixed don't crash when trying to get embedded lyrics from online streams
+- add option to clean song title
 
 v2.0.0
 - convert script to a service

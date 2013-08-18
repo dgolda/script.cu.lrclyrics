@@ -1,5 +1,6 @@
 import sys
 import os
+import re
 import chardet
 import unicodedata
 import xbmc, xbmcvfs, xbmcgui
@@ -162,5 +163,6 @@ class Song:
         song.artist = xbmc.getInfoLabel( "MusicPlayer%s.Artist" % offset_str)
         if ( song.filepath and ( (not song.title) or (not song.artist) or (__addon__.getSetting( "read_filename" ) == "true") ) ):
             song.artist, song.title = get_artist_from_filename( song.filepath )
-
+        if __addon__.getSetting( "clean_title" ) == "true":
+            song.title = re.sub(r'\([^\)]*\)$', '', song.title)
         return song
