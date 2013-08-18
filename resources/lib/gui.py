@@ -153,16 +153,16 @@ class MAIN():
         lyrics.source = __language__( 30000 )
         lyrics.lrc = getlrc
         # Search save path by Cu LRC Lyrics
-        song_path = song.path1(getlrc)
-        if xbmcvfs.exists(song_path):
-            lyr = get_textfile( song_path )
+        lyricsfile = song.path1(getlrc)
+        if xbmcvfs.exists(lyricsfile):
+            lyr = get_textfile( lyricsfile )
             if lyr:
                 lyrics.lyrics = lyr
                 return lyrics
         # Search same path with song file
-        song_path = song.path2(getlrc)
-        if xbmcvfs.exists(song_path):
-            lyr = get_textfile( song_path )
+        lyricsfile = song.path2(getlrc)
+        if xbmcvfs.exists(lyricsfile):
+            lyr = get_textfile( lyricsfile )
             if lyr:
                 lyrics.lyrics = lyr
                 return lyrics
