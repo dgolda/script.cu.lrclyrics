@@ -77,11 +77,14 @@ class MAIN():
     def find_lyrics(self, song):
         # search embedded lrc lyrics
         if ( __addon__.getSetting( "search_embedded" ) == "true" ):
-            lyrics = getEmbedLyrics(song, True)
+            try:
+                lyrics = getEmbedLyrics(song, True)
+            except:
+                lyrics = None
             if ( lyrics ):
                 log('found embedded lrc lyrics')
                 return lyrics
-        # search lrc lyrics in file
+        # search lrc lyrics from file
         if ( __addon__.getSetting( "search_file" ) == "true" ):
             lyrics = self.get_lyrics_from_file(song, True)
             if ( lyrics ):
@@ -97,11 +100,14 @@ class MAIN():
                     return lyrics
         # search embedded txt lyrics
         if ( __addon__.getSetting( "search_embedded" ) == "true" ):
-            lyrics = getEmbedLyrics(song, False)
+            try:
+                lyrics = getEmbedLyrics(song, False)
+            except:
+                lyrics = None
             if lyrics:
                 log('found embedded txt lyrics')
                 return lyrics
-        # search txt lyrics in file
+        # search txt lyrics from file
         if ( __addon__.getSetting( "search_file" ) == "true" ):
             lyrics = self.get_lyrics_from_file(song, False)
             if ( lyrics ):
