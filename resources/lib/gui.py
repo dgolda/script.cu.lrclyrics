@@ -274,7 +274,7 @@ class GUI( xbmcgui.WindowXMLDialog ):
             WIN.setProperty('culrc.haslist', 'true')
             self.prepare_list(self.lyrics.list)
         else:
-            WIN.clearProperty('culrc.newlyrics')
+            WIN.clearProperty('culrc.haslist')
 
     def gui_loop(self):
         # gui loop
@@ -299,7 +299,7 @@ class GUI( xbmcgui.WindowXMLDialog ):
     def setup_gui(self):
         WIN.clearProperty('culrc.newlyrics')
         WIN.clearProperty('culrc.nolyrics')
-        WIN.clearProperty('culrc.newlyrics')
+        WIN.clearProperty('culrc.haslist')
         self.lock = thread.allocate_lock()
         self.timer = None
         self.allowtimer = True
