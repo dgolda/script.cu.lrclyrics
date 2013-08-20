@@ -1,3 +1,6 @@
+v2.0.3
+- gui cleanup
+
 v2.0.2
 - fix crash when failing to read lyrics file
 - fixed update scraper list when settings change

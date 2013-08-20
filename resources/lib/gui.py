@@ -268,19 +268,13 @@ class GUI( xbmcgui.WindowXMLDialog ):
         if self.lyrics.lyrics:
             self.show_lyrics(self.lyrics)
         else:
-            self.show_error()
+            WIN.setProperty('culrc.lyrics', __language__( 30001 ))
         self.getControl( 120 ).reset()
         if self.lyrics.list:
-            try:
-                self.getControl( 299 ).setVisible(True)
-            except:
-                pass
+            WIN.setProperty('culrc.haslist', 'true')
             self.prepare_list(self.lyrics.list)
         else:
-            try:
-                self.getControl( 299 ).setVisible(False)
-            except:
-                pass
+            WIN.clearProperty('culrc.newlyrics')
 
     def gui_loop(self):
         # gui loop
@@ -305,10 +299,7 @@ class GUI( xbmcgui.WindowXMLDialog ):
     def setup_gui(self):
         WIN.clearProperty('culrc.newlyrics')
         WIN.clearProperty('culrc.nolyrics')
-        try:
-            self.getControl( 299 ).setVisible(False)
-        except:
-            pass
+        WIN.clearProperty('culrc.newlyrics')
         self.lock = thread.allocate_lock()
         self.timer = None
         self.allowtimer = True
@@ -368,28 +359,10 @@ class GUI( xbmcgui.WindowXMLDialog ):
         self.lock.release()
 
     def show_control(self, controlId):
-        self.getControl( 100 ).setVisible( controlId == 100 )
-        self.getControl( 101 ).setVisible( controlId == 100 )
         self.getControl( 110 ).setVisible( controlId == 110 )
-        self.getControl( 111 ).setVisible( controlId == 110 )
         self.getControl( 120 ).setVisible( controlId == 120 )
-        self.getControl( 121 ).setVisible( controlId == 120 )
         xbmc.sleep( 5 )
-        if controlId == 100:
-            try:
-                self.setFocus( self.getControl( 605 ) )
-            except:
-                pass
-        else:
-            try:
-                self.setFocus( self.getControl( controlId ) )
-            except:
-                self.setFocus( self.getControl( controlId + 1 ) )
-
-    def show_error(self):
-        self.getControl( 100 ).setText( __language__( 30001 ) )
-        WIN.setProperty('culrc.lyrics', __language__( 30001 ))
-        self.show_control( 100 )
+        self.setFocus( self.getControl( controlId ) )
 
     def show_lyrics(self, lyrics):
         WIN.setProperty('culrc.lyrics', lyrics.lyrics)
@@ -452,7 +425,6 @@ class GUI( xbmcgui.WindowXMLDialog ):
             self.save_lyrics_to_file( self.current_lyrics )
 
     def reset_controls(self):
-        self.getControl( 100 ).setText(xbmc.getLocalizedString(194))
         self.getControl( 110 ).reset()
         self.getControl( 200 ).setLabel('')
         WIN.clearProperty('culrc.lyrics')
