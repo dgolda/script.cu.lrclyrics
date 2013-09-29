@@ -27,7 +27,7 @@ class MAIN():
     def setup_main(self):
         self.fetchedLyrics = []
         self.current_lyrics = Lyrics()
-        self.MyPlayer = MyPlayer( xbmc.PLAYER_CORE_PAPLAYER, function=self.myPlayerChanged )
+        self.MyPlayer = MyPlayer(function=self.myPlayerChanged)
         self.Monitor = MyMonitor(function = self.update_settings)
 
     def get_scraper_list(self):
